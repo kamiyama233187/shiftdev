@@ -154,7 +154,9 @@ function getDate(base,i){
 }
 
 function getDays(){
-  return days;
+  const ths = document.querySelectorAll('#sheet table tr:first-child th');
+  if(ths.length === 0) return days; // 初回保険
+  return ths.length - 1; // 左の名前列を引く
 }
 
 /* ヘッダー */
