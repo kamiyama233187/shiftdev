@@ -95,6 +95,8 @@ th{width:140px;height:50px;font-size:18px;padding:0;}
   <button onclick="removeStaff()">スタッフ削除</button>
   <button onclick="insertHeaderRow()">日付行挿入</button>
   <button onclick="addShiftType()">シフト追加</button>
+  <button onclick="showFirstHalf()">前半</button>
+<button onclick="showSecondHalf()">後半</button>
   <button onclick="exportPDF()">PDF</button>
   <button onclick="openHelp()">ヘルプ</button>
 </div>
@@ -554,6 +556,18 @@ function openHelp(){
 
 function getDay(d){
   return ["日","月","火","水","木","金","土"][d.getDay()];
+}
+
+function showFirstHalf(){
+  viewStart = 0;
+  viewDays = 15;
+  build();
+}
+
+function showSecondHalf(){
+  viewStart = 15;
+  viewDays = days - 15; // 月末まで
+  build();
 }
 
 build();
