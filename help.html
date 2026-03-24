@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ヘルプ</title>
+
+<style>
+body{
+  margin:0;
+  font-family:"Meiryo";
+  padding:20px;
+  background:#fff;
+}
+
+h1{
+  margin-bottom:10px;
+}
+
+.section{
+  margin-bottom:25px;
+}
+
+.title{
+  font-weight:bold;
+  font-size:18px;
+  margin-bottom:5px;
+}
+
+.desc{
+  font-size:14px;
+  color:#333;
+}
+
+.back{
+  position:fixed;
+  bottom:20px;
+  left:20px;
+  padding:10px 16px;
+  background:#333;
+  color:#fff;
+  border:none;
+  border-radius:6px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>ヘルプ</h1>
+
+<div class="section">
+  <div class="title">＋ / −</div>
+  <div class="desc">表のズームイン・ズームアウト</div>
+</div>
+
+<div class="section">
+  <div class="title">開始日</div>
+  <div class="desc">シフト表の開始日を設定</div>
+</div>
+
+<div class="section">
+  <div class="title">月表示</div>
+  <div class="desc">左上の月表示を変更</div>
+</div>
+
+<div class="section">
+  <div class="title">スタッフ追加</div>
+  <div class="desc">新しいスタッフを追加</div>
+</div>
+
+<div class="section">
+  <div class="title">スタッフ削除</div>
+  <div class="desc">名前を指定して削除</div>
+</div>
+
+<div class="section">
+  <div class="title">日付行挿入</div>
+  <div class="desc">任意の位置にヘッダーを追加</div>
+</div>
+
+<div class="section">
+  <div class="title">シフト入力</div>
+  <div class="desc">セルをタップしてシフト選択</div>
+</div>
+
+<div class="section">
+  <div class="title">ドラッグ並び替え</div>
+  <div class="desc">名前を長押しして上下に移動</div>
+</div>
+
+<div class="section">
+  <div class="title">PDF</div>
+  <div class="desc">シフト表をA3で出力</div>
+</div>
+
+<button class="back" onclick="goBack()">戻る</button>
+
+<script>
+function goBack(){
+  window.location.href = "index.html";
+}
+</script>
+
+</body>
+</html>

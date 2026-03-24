@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#eeeeee">
+<title>シフト管理 完全版</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+/* 挿入ライン */
+.insert-line{
+  position:absolute;
+  height:3px;
+  background:red;
+  left:0;
+  right:0;
+  z-index:9998;
+  pointer-events:none;
+}
+body{margin:0;font-family:"Meiryo";background:#fff;}
+
+#toolbar{display:flex;gap:6px;padding:8px;background:#eee;flex-wrap:wrap;}
+#grid{overflow:auto;height:calc(100vh - 200px);}
+#sheet{transform-origin: top left;}
+
+table{border-collapse:collapse;width:max-content;}
+th,td{border:1px solid #aaa;text-align:center;}
+th{width:140px;height:50px;font-size:18px;padding:0;}
+
+.name{
+  min-width:160px;
+  text-align:left;
+  padding-left:8px;
+  font-size:18px;
+  user-select:none;
+  touch-action:none;
+}
+
+.day-cell{width:140px;height:70px;padding:0;}
+
+.wrap{display:flex;width:100%;height:100%;}
+.half{
+  flex:1;display:flex;align-items:center;justify-content:center;
+  font-size:20px;border-right:1px solid #aaa;
+}
+.half:last-child{border-right:none;}
+.aoshi{background:#a9c4db;}
+
+.selected{outline:3px solid orange;}
+
+.dragging{
+  position:fixed;
+  z-index:9999;
+  pointer-events:none;
+  background:#fff;
+  opacity:0.85;
+  box-shadow:0 10px 25px rgba(0,0,0,0.4);
+}
+
+#selector{
+  position:fixed;bottom:0;left:0;right:0;
+  background:#eee;padding:10px;
+  display:flex;flex-wrap:wrap;gap:10px;
+}
+
+.close-btn{
+  position:absolute;right:10px;top:5px;font-size:22px;
+}
+
+#selector button{
+  font-size:20px;padding:16px;min-width:80px;
+}
+
+#counter{
+  font-size:12px;padding:8px;background:#fafafa;
+}
+
+
+</style>
+</head>
+
+<body>
+
+<div id="toolbar">
+  <button onclick="zoomIn()">＋</button>
+  <button onclick="zoomOut()">－</button>
+
+  <button onclick="setStartDate()">開始日</button>
+  <button onclick="setMonthLabel()">月表示</button>
+  <button onclick="insertStaff()">スタッフ追加</button>
+  <button onclick="removeStaff()">スタッフ削除</button>
+  <button onclick="insertHeaderRow()">日付行挿入</button>
+  <button onclick="addShiftType()">シフト追加</button>
+  <button onclick="exportPDF()">PDF</button>
+  <button onclick="openHelp()">ヘルプ</button>
+</div>
+
+<div id="grid">
+  <div id="sheet"></div>
+</div>
+
+<div id="counter"></div>
+
+<script>
+const { jsPDF } = window.jspdf;
+
+let zoom=1;
+let selectedKey=null;
+
+let startDate=localStorage.getItem('startDate')||'20260101';
+let monthLabel=localStorage.getItem('monthLabel')||'1月';
+let shifts=JSON.parse(localStorage.getItem('shifts')||'["A","B","C","D","E","休"]');
+let rows = JSON.parse(localStorage.getItem('rows') || '[]');
+
+// 初回だけ初期化
+if(rows.length === 0){
+  rows.push({type:'header'});
+
+  const savedStaff = JSON.parse(localStorage.getItem('staff')||'["スタッフ1"]');
+
+  savedStaff.forEach(name=>{
+    rows.push({type:'staff', name});
+  });
+
+  localStorage.setItem('rows', JSON.stringify(rows));
+}
+let data=JSON.parse(localStorage.getItem('data')||'{}');
+let headerRows=JSON.parse(localStorage.getItem('headerRows')||'[]');
+
+let days=16;
+
+/* 保存 */
+function save(){
+  localStorage.setItem('rows',JSON.stringify(rows));
+  localStorage.setItem('data',JSON.stringify(data));
+  localStorage.setItem('shifts',JSON.stringify(shifts)); // ★追加
+}
+
+/* 日付 */
+function getDate(base,i){
+  const d=new Date(base.slice(0,4),base.slice(4,6)-1,base.slice(6,8));
+  d.setDate(d.getDate()+i);
+  return d;
+}
+
+function getDay(d){
+  return ["日","月","火","水","木","金","土"][d.getDay()];
+}
+
+/* ヘッダー */
+function createHeader(){
+  let html='';
+
+  // 日付
+  html += `<tr><th class="name">${monthLabel}</th>`;
+  for(let i=0;i<getDays();i++){
+    html += `<th>${getDate(startDate,i).getDate()}</th>`;
+  }
+  html += '</tr>';
+
+  // 曜日
+  html += `<tr><th class="name"></th>`;
+  for(let i=0;i<getDays();i++){
+    html += `<th>${getDay(getDate(startDate,i))}</th>`;
+  }
+  html += '</tr>';
+
+  // ★青市 / 南店（分割）
+  html += `<tr><th class="name"></th>`;
+  for(let i=0;i<getDays();i++){
+    html += `
+<th>
+  <div class="wrap">
+
+    <div class="half aoshi">
+      青市
+    </div>
+
+    <div class="half">
+      南店
+    </div>
+
+  </div>
+</th>`;
+  }
+  html += '</tr>';
+
+  return html;
+}
+
+/* 表 */
+function build(){
+
+  let html = '<table>';
+
+  rows.forEach((row,i)=>{
+
+    // ===== ヘッダー =====
+    if(row.type === 'header'){
+      html += createHeader();
+      return;
+    }
+
+    // ===== スタッフ =====
+    const name = row.name;
+
+    html += `<tr data-index="${i}">
+<td class="name"
+ ontouchstart="pressStart(event,${i})"
+ ontouchend="pressEnd()">
+ ${name}
+</td>`;
+
+    for(let d=0; d<getDays(); d++){
+
+      const keyA = name+'_'+d+'_A';
+      const keyB = name+'_'+d+'_B';
+
+      html += `
+<td class="day-cell">
+  <div class="wrap">
+
+    <div class="half aoshi ${selectedKey===keyA?'selected':''}"
+      onclick="selectCell('${keyA}')">
+      ${data[keyA]||''}
+    </div>
+
+    <div class="half ${selectedKey===keyB?'selected':''}"
+      onclick="selectCell('${keyB}')">
+      ${data[keyB]||''}
+    </div>
+
+  </div>
+</td>`;
+    }
+
+    html += '</tr>';
+  });
+
+  html += '</table>';
+
+  sheet.innerHTML = html;
+  sheet.style.transform = `scale(${zoom})`;
+
+  updateCounter();
+}
+
+/* ===== ドラッグ ===== */
+let pressTimer=null;
+let dragging=false;
+let dragEl=null;
+let dragIndex=null;
+let dropTargetIndex = null;
+let insertLine = null;
+
+function pressStart(e,index){
+  dropTargetIndex = index;
+  pressTimer=setTimeout(()=>{
+    dragging=true;
+    dragIndex=index;
+
+    const row=e.target.closest('tr');
+    dragEl=row.cloneNode(true);
+    dragEl.classList.add('dragging');
+    document.body.appendChild(dragEl);
+
+    moveDrag(e);
+
+    document.addEventListener('touchmove',moveDrag,{passive:false});
+    document.addEventListener('touchend',endDrag);
+  },300);
+}
+
+function pressEnd(){
+  clearTimeout(pressTimer);
+}
+
+function moveDrag(e){
+  if(!dragging) return;
+
+  e.preventDefault();
+
+  const touch = e.touches[0];
+  const y = touch.clientY;
+
+  dragEl.style.top = (y - 30) + 'px';
+
+  const rows = [...document.querySelectorAll('tr[data-index]')];
+
+  let found = false;
+
+  rows.forEach((row,i)=>{
+    const rect = row.getBoundingClientRect();
+    const center = rect.top + rect.height / 2;
+
+    if(y < center && !found){
+      dropTargetIndex = i;
+      showInsertLine(rect.top);
+      found = true;
+    }
+  });
+
+  if(!found){
+    dropTargetIndex = rows.length - 1;
+    const lastRect = rows[rows.length-1].getBoundingClientRect();
+    showInsertLine(lastRect.bottom);
+  }
+
+  autoScroll(y);
+}
+
+
+function endDrag(){
+  clearTimeout(pressTimer);
+
+  if(dragEl){
+    dragEl.remove();
+    dragEl=null;
+  }
+
+  if(
+    dropTargetIndex !== null &&
+    dragIndex !== null &&
+    rows[dragIndex] !== undefined
+  ){
+    const moved = rows.splice(dragIndex,1)[0];
+
+    if(moved){
+
+      let insertIndex = dropTargetIndex + 1;
+
+      // 下方向補正
+      if(dragIndex < insertIndex){
+        insertIndex--;
+      }
+
+      rows.splice(insertIndex,0,moved);
+    }
+  }
+
+  dragging=false;
+  dropTargetIndex=null;
+  dragIndex=null;
+
+  document.removeEventListener('touchmove',moveDrag);
+  document.removeEventListener('touchend',endDrag);
+
+  removeInsertLine();
+  save();
+  build();
+}
+function autoScroll(y){
+  const edge = 80; // 端から何pxで発動
+
+  if(y < edge){
+    window.scrollBy(0,-15);
+  }else if(y > window.innerHeight - edge){
+    window.scrollBy(0,15);
+  }
+}
+function showInsertLine(y){
+  if(!insertLine){
+    insertLine = document.createElement('div');
+    insertLine.className = 'insert-line';
+    document.body.appendChild(insertLine);
+  }
+
+  insertLine.style.top = y + 'px';
+}
+
+function removeInsertLine(){
+  if(insertLine){
+    insertLine.remove();
+    insertLine = null;
+  }
+}
+/* セル */
+function selectCell(key){
+  selectedKey=key;
+  openSelector(key);
+  build();
+}
+
+function openSelector(key){
+  const old=document.getElementById('selector');
+  if(old) old.remove();
+
+  const box=document.createElement('div');
+  box.id='selector';
+
+  const close=document.createElement('div');
+  close.innerText='×';
+  close.className='close-btn';
+  close.onclick=()=>box.remove();
+  box.appendChild(close);
+
+  shifts.forEach(s=>{
+    const btn=document.createElement('button');
+    btn.innerText=s;
+    btn.onclick=()=>{
+      data[key]=s;
+      save();
+      box.remove();
+      build();
+    };
+    box.appendChild(btn);
+  });
+
+  document.body.appendChild(box);
+}
+
+function countShift(value, counter){
+  if(!value) return;
+
+  value.split('').forEach(ch=>{
+    if("ABCDE".includes(ch)){
+      counter[ch] = (counter[ch] || 0) + 1;
+    }
+  });
+}
+/* カウント */
+function updateCounter(){
+  let txt='';
+  for(let d=0;d<getDays();d++){
+    let A={},B={};
+    rows.forEach(r=>{
+  if(r.type !== 'staff') return;
+
+  const n = r.name;
+
+  let vA = data[n+'_'+d+'_A'];
+  let vB = data[n+'_'+d+'_B'];
+
+ countShift(vA, A);
+countShift(vB, B);
+});
+    txt+=`${d+1}日 青市:${JSON.stringify(A)} 南店:${JSON.stringify(B)}<br>`;
+  }
+  counter.innerHTML=txt;
+}
+
+/* その他 */
+function zoomIn(){zoom+=0.1;build();}
+function zoomOut(){zoom=Math.max(0.5,zoom-0.1);build();}
+
+function insertStaff(){
+  const n=prompt('スタッフ名');
+  if(n){
+    rows.push({type:'staff', name:n});
+    save();
+    build();
+  }
+}
+
+function removeStaff(){
+  const n=prompt('削除名');
+  rows = rows.filter(r => !(r.type === 'staff' && r.name === n));
+  save();
+  build();
+}
+
+function insertHeaderRow(){
+  const pos = parseInt(prompt('何行目の下に追加？')) - 1;
+
+  if(!isNaN(pos)){
+    rows.splice(pos+1,0,{type:'header'});
+    save();
+    build();
+  }
+}
+
+function addShiftType(){
+  const v=prompt('シフト追加');
+  if(v){shifts.push(v);save();}
+}
+
+function setStartDate(){
+  const v=prompt('開始日',startDate);
+  if(v){startDate=v;localStorage.setItem('startDate',v);build();}
+}
+
+function setMonthLabel(){
+  const v=prompt('月表示',monthLabel);
+  if(v){monthLabel=v;localStorage.setItem('monthLabel',v);build();}
+}
+
+async function exportPDF(){
+
+  const el = document.getElementById('sheet');
+
+  // 一時的にズーム解除（超重要）
+  const oldTransform = el.style.transform;
+  el.style.transform = "scale(1)";
+
+  const canvas = await html2canvas(el, {
+    scale: 2,
+    useCORS: true,
+    scrollX: 0,
+    scrollY: 0,
+    windowWidth: el.scrollWidth,
+    windowHeight: el.scrollHeight
+  });
+
+  // 元に戻す
+  el.style.transform = oldTransform;
+
+  const imgData = canvas.toDataURL('image/png');
+
+  const pdf = new jsPDF('landscape', 'mm', 'a3');
+
+  const pageWidth = 420; // A3横
+  const pageHeight = 297;
+
+  const imgWidth = pageWidth;
+  const imgHeight = canvas.height * pageWidth / canvas.width;
+
+  pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+
+  pdf.save('shift.pdf');
+}
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
+
+function openHelp(){
+  window.location.href = "help.html";
+}
+
+function getDays(){
+  const firstRow = document.querySelector('table tr');
+  if(!firstRow) return days; // 初回はまだtableないので保険
+  return firstRow.querySelectorAll('th').length - 1;
+}
+build();
+
+</script>
+
+</body>
+</html>
