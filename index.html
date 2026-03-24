@@ -139,6 +139,9 @@ let days=16;
   days = new Date(year, month, 0).getDate();
 }
 
+let viewStart = 0;   // 何日目から表示するか（0 = 1日）
+let viewDays = 15;   // 何日分表示するか
+
 /* 保存 */
 function save(){
   localStorage.setItem('rows',JSON.stringify(rows));
@@ -165,21 +168,21 @@ function createHeader(){
 
   // 日付
   html += `<tr><th class="name">${monthLabel}</th>`;
-  for(let i=0;i<getDays();i++){
+  for(let i=0;i<viewDays;i++){
     html += `<th>${getDate(startDate,i).getDate()}</th>`;
   }
   html += '</tr>';
 
   // 曜日
   html += `<tr><th class="name"></th>`;
-  for(let i=0;i<getDays();i++){
+  for(let i=0;i<viewDays;i++){
     html += `<th>${getDay(getDate(startDate,i))}</th>`;
   }
   html += '</tr>';
 
   // ★青市 / 南店（分割）
   html += `<tr><th class="name"></th>`;
-  for(let i=0;i<getDays();i++){
+  for(let i=0;i<viewDays;i++){
     html += `
 <th>
   <div class="wrap">
