@@ -147,8 +147,8 @@ function getDate(base,i){
   return d;
 }
 
-function getDay(d){
-  return ["日","月","火","水","木","金","土"][d.getDay()];
+function getDays(){
+  return days;
 }
 
 /* ヘッダー */
@@ -480,7 +480,18 @@ function addShiftType(){
 
 function setStartDate(){
   const v=prompt('開始日',startDate);
-  if(v){startDate=v;localStorage.setItem('startDate',v);build();}
+  if(v){
+    startDate=v;
+
+    // ★ここ追加（月の日数を自動計算）
+    const year = parseInt(v.slice(0,4));
+    const month = parseInt(v.slice(4,6));
+
+    days = new Date(year, month, 0).getDate();
+
+    localStorage.setItem('startDate',v);
+    build();
+  }
 }
 
 function setMonthLabel(){
