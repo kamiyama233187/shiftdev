@@ -226,7 +226,7 @@ function build(){
  ${name}
 </td>`;
 
-    for(let d=0; d<getDays(); d++){
+    for(let i=0; i<viewDays; i++){   const d = i + viewStart;
 
       const keyA = name+'_'+d+'_A';
       const keyB = name+'_'+d+'_B';
@@ -436,7 +436,7 @@ function countShift(value, counter){
 /* カウント */
 function updateCounter(){
   let txt='';
-  for(let d=0;d<getDays();d++){
+  for(let i=0;i<viewDays;i++){   const d = i + viewStart;
     let A={},B={};
     rows.forEach(r=>{
   if(r.type !== 'staff') return;
