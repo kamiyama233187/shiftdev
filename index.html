@@ -132,6 +132,12 @@ let data=JSON.parse(localStorage.getItem('data')||'{}');
 let headerRows=JSON.parse(localStorage.getItem('headerRows')||'[]');
 
 let days=16;
+// ★初期ロード時に日数を再計算
+{
+  const year = parseInt(startDate.slice(0,4));
+  const month = parseInt(startDate.slice(4,6));
+  days = new Date(year, month, 0).getDate();
+}
 
 /* 保存 */
 function save(){
@@ -541,11 +547,10 @@ function openHelp(){
   window.location.href = "help.html";
 }
 
-function getDays(){
-  const firstRow = document.querySelector('table tr');
-  if(!firstRow) return days; // 初回はまだtableないので保険
-  return firstRow.querySelectorAll('th').length - 1;
+function getDay(d){
+  return ["日","月","火","水","木","金","土"][d.getDay()];
 }
+
 build();
 
 </script>
